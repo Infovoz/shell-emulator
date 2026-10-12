@@ -3,6 +3,7 @@
 import argparse
 import getpass
 import os
+import platform
 import socket
 import sys
 import tkinter as tk
@@ -100,7 +101,7 @@ class ShellEmulatorGUI:
 
         self.prompt_label = tk.Label(
             input_frame,
-            text="$ ",
+            text=f"{self.vfs.current_dir} $ ",
             fg="#00ff66",
             bg="#1e1e1e",
             font=text_font,
@@ -118,6 +119,10 @@ class ShellEmulatorGUI:
         self.entry.pack(side=tk.LEFT, fill=tk.X, expand=True)
         self.entry.bind("<Return>", self._handle_input)
         self.entry.focus_set()
+
+    def _update_prompt(self) -> None:
+        """Refresh command prompt label with current directory."""
+        self.prompt_label.config(text=f"{self.vfs.current_dir} $ ")
 
     def _print_debug_info(self) -> None:
         """Display configuration parameters and VFS load status."""
@@ -162,7 +167,7 @@ class ShellEmulatorGUI:
 
     def _run_command_line(self, line: str) -> None:
         """Simulate shell dialogue and log results."""
-        self._print_line(f"$ {line}")
+        self._print_line(f"{self.vfs.current_dir} $ {line}")
         tokens = line.strip().split()
         if not tokens:
             return
@@ -170,24 +175,69 @@ class ShellEmulatorGUI:
         command = tokens[0]
         args = tokens[1:]
         err = self._dispatch_command(command, args)
+        self._update_prompt()
         self.logger.log_action(line, err)
 
-    def _dispatch_command(
-        self,
-        command: str,
-        args: list[str],
-    ) -> str | None:
-        """Route command to handler. Return error message if any."""
+    def _dispatch_command(self, command: str, args: list[str]) -> str | None:
+        """Route entered command to handler. Return error message on failure."""
         if command == "exit":
             self.root.destroy()
             sys.exit(0)
-        elif command in ("ls", "cd"):
-            self._print_line(f"Stub: command '{command}' called with: {args}")
-            return None
+        handlers = {
+            "ls": self._cmd_ls,
+            "cd": self._cmd_cd,
+            "cat": self._cmd_cat,
+            "tac": self._cmd_tac,
+            "uname": self._cmd_uname,
+        }
+        handler = handlers.get(command)
+        if not handler:
+            err = f"command not found: {command}"
+            self._print_line(f"Error: {err}")
+            return err
 
-        err_msg = f"command not found: {command}"
-        self._print_line(f"Error: {err_msg}")
-        return err_msg
+        try:
+            handler(args)
+            return None
+        except Exception as exc:
+            err = str(exc)
+            self._print_line(f"Error: {err}")
+            return err
+
+    def _cmd_ls(self, args: list[str]) -> None:
+        """Execute ls command."""
+        target = args[0] if args else ""
+        items = self.vfs.list_dir(target)
+        self._print_line("  ".join(items) if items else "")
+
+    def _cmd_cd(self, args: list[str]) -> None:
+        """Execute cd command."""
+        target = args[0] if args else "/home"
+        self.vfs.change_dir(target)
+
+    def _cmd_cat(self, args: list[str]) -> None:
+        """Execute cat command."""
+        if not args:
+            raise ValueError("cat: missing file argument")
+        for file_arg in args:
+            content = self.vfs.read_file(file_arg)
+            self._print_line(content.rstrip("\n"))
+
+    def _cmd_tac(self, args: list[str]) -> None:
+        """Execute tac command."""
+        if not args:
+            raise ValueError("tac: missing file argument")
+        for file_arg in args:
+            content = self.vfs.read_file_reversed(file_arg)
+            self._print_line(content.rstrip("\n"))
+
+    def _cmd_uname(self, args: list[str]) -> None:
+        """Execute uname command."""
+        if args and "-a" in args:
+            info = f"{platform.system()} {socket.gethostname()} {platform.release()}"
+        else:
+            info = platform.system()
+        self._print_line(info)
 
 
 def parse_arguments() -> argparse.Namespace:
@@ -195,11 +245,7 @@ def parse_arguments() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="UNIX Shell Emulator")
     parser.add_argument("--vfs", dest="vfs", help="Path to VFS archive")
     parser.add_argument("--log", dest="log", help="Path to XML log file")
-    parser.add_argument(
-        "--script",
-        dest="script",
-        help="Path to startup script",
-    )
+    parser.add_argument("--script", dest="script", help="Path to startup script")
     return parser.parse_args()
 
 

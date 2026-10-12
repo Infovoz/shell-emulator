@@ -1,0 +1,9 @@
+﻿ls
+cd /home/user
+ls
+cat readme.txt
+tac readme.txt
+uname
+uname -a
+cd /nonexistent
+ls

@@ -1,4 +1,4 @@
-"""In-memory virtual file system loaded from ZIP archive."""
+"""In-memory virtual file system with shell operations."""
 
 import io
 import os
@@ -23,7 +23,7 @@ class VirtualFileSystem:
             self._init_default_vfs()
 
     def _normalize_path(self, path: str) -> str:
-        """Normalize VFS path to UNIX format."""
+        """Normalize VFS path to standard UNIX representation."""
         cleaned = path.replace("\\", PATH_SEP).strip()
         parts = [p for p in cleaned.split(PATH_SEP) if p and p != "."]
         return PATH_SEP + PATH_SEP.join(parts)
@@ -38,7 +38,7 @@ class VirtualFileSystem:
             "/bin",
         })
         self.files["/home/user/readme.txt"] = (
-            b"Welcome to in-memory VFS default tree!\n"
+            b"Line 1: Welcome to in-memory VFS!\nLine 2: Enjoy using shell.\n"
         )
         self.files["/etc/config.cfg"] = b"theme=dark\nmode=interactive\n"
 
@@ -72,7 +72,10 @@ class VirtualFileSystem:
         if target_path.startswith(PATH_SEP):
             raw = target_path
         else:
-            raw = os.path.join(self.current_dir, target_path)
+            if self.current_dir == PATH_SEP:
+                raw = PATH_SEP + target_path
+            else:
+                raw = f"{self.current_dir}/{target_path}"
 
         norm = self._normalize_path(raw)
         tokens = [t for t in norm.split(PATH_SEP) if t]
@@ -84,3 +87,54 @@ class VirtualFileSystem:
             else:
                 stack.append(token)
         return PATH_SEP + PATH_SEP.join(stack)
+
+    def list_dir(self, target_path: str = "") -> list[str]:
+        """List immediate child nodes for specified directory path."""
+        resolved = self.resolve_path(target_path) if target_path else self.current_dir
+        if resolved not in self.directories:
+            raise FileNotFoundError(f"ls: cannot access '{target_path}': No such directory")
+
+        entries: set[str] = set()
+        prefix = resolved if resolved != PATH_SEP else ""
+
+        for directory in self.directories:
+            if directory != resolved and directory.startswith(prefix + PATH_SEP):
+                remainder = directory[len(prefix) + 1:].split(PATH_SEP)[0]
+                if remainder:
+                    entries.add(remainder + "/")
+
+        for file_path in self.files:
+            if file_path.startswith(prefix + PATH_SEP):
+                remainder = file_path[len(prefix) + 1:].split(PATH_SEP)[0]
+                if remainder:
+                    if PATH_SEP in file_path[len(prefix) + 1:]:
+                        entries.add(remainder + "/")
+                    else:
+                        entries.add(remainder)
+
+        return sorted(entries)
+
+    def change_dir(self, target_path: str) -> None:
+        """Change current directory within in-memory tree."""
+        resolved = self.resolve_path(target_path)
+        if resolved in self.directories:
+            self.current_dir = resolved
+        elif resolved in self.files:
+            raise NotADirectoryError(f"cd: not a directory: {target_path}")
+        else:
+            raise FileNotFoundError(f"cd: no such file or directory: {target_path}")
+
+    def read_file(self, target_path: str) -> str:
+        """Read and decode file contents from memory."""
+        resolved = self.resolve_path(target_path)
+        if resolved in self.directories:
+            raise IsADirectoryError(f"cat: {target_path}: Is a directory")
+        if resolved not in self.files:
+            raise FileNotFoundError(f"cat: {target_path}: No such file")
+        return self.files[resolved].decode("utf-8", errors="replace")
+
+    def read_file_reversed(self, target_path: str) -> str:
+        """Read file contents and reverse line order."""
+        content = self.read_file(target_path)
+        lines = content.splitlines()
+        return "\n".join(reversed(lines))
