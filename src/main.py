@@ -10,7 +10,7 @@ import tkinter as tk
 from tkinter import font
 import xml.etree.ElementTree as ET
 
-from vfs import VirtualFileSystem
+from src.vfs import VirtualFileSystem
 
 WINDOW_WIDTH = 720
 WINDOW_HEIGHT = 450
