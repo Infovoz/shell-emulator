@@ -40,6 +40,23 @@ class TestVfsCommands(unittest.TestCase):
         lines = content.splitlines()
         self.assertTrue(lines[0].startswith("Line 2:"))
 
+    def test_cp_file_to_file(self) -> None:
+        """Verify copying file to a new location in memory."""
+        self.vfs.copy_item("/home/user/readme.txt", "/home/user/copy.txt")
+        content = self.vfs.read_file("/home/user/copy.txt")
+        self.assertIn("Welcome to in-memory VFS", content)
+
+    def test_cp_file_into_directory(self) -> None:
+        """Verify copying file into existing folder."""
+        self.vfs.copy_item("/home/user/readme.txt", "/etc")
+        content = self.vfs.read_file("/etc/readme.txt")
+        self.assertIn("Welcome to in-memory VFS", content)
+
+    def test_cp_nonexistent_source(self) -> None:
+        """Verify cp error on missing source."""
+        with self.assertRaises(FileNotFoundError):
+            self.vfs.copy_item("/ghost.txt", "/home")
+
 
 if __name__ == "__main__":
     unittest.main()

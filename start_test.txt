@@ -2,8 +2,11 @@
 cd /home/user
 ls
 cat readme.txt
-tac readme.txt
-uname
-uname -a
-cd /nonexistent
+cp readme.txt backup.txt
 ls
+cat backup.txt
+tac backup.txt
+cp readme.txt /etc
+ls /etc
+uname -a
+cp nonexistent.txt destination.txt

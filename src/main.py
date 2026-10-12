@@ -189,6 +189,7 @@ class ShellEmulatorGUI:
             "cat": self._cmd_cat,
             "tac": self._cmd_tac,
             "uname": self._cmd_uname,
+            "cp": self._cmd_cp,
         }
         handler = handlers.get(command)
         if not handler:
@@ -238,6 +239,12 @@ class ShellEmulatorGUI:
         else:
             info = platform.system()
         self._print_line(info)
+
+    def _cmd_cp(self, args: list[str]) -> None:
+        """Execute cp command."""
+        if len(args) < 2:
+            raise ValueError("cp: missing destination file operand")
+        self.vfs.copy_item(args[0], args[1])
 
 
 def parse_arguments() -> argparse.Namespace:

@@ -90,9 +90,13 @@ class VirtualFileSystem:
 
     def list_dir(self, target_path: str = "") -> list[str]:
         """List immediate child nodes for specified directory path."""
-        resolved = self.resolve_path(target_path) if target_path else self.current_dir
+        resolved = (
+            self.resolve_path(target_path) if target_path else self.current_dir
+        )
         if resolved not in self.directories:
-            raise FileNotFoundError(f"ls: cannot access '{target_path}': No such directory")
+            raise FileNotFoundError(
+                f"ls: cannot access '{target_path}': No such directory"
+            )
 
         entries: set[str] = set()
         prefix = resolved if resolved != PATH_SEP else ""
@@ -122,7 +126,9 @@ class VirtualFileSystem:
         elif resolved in self.files:
             raise NotADirectoryError(f"cd: not a directory: {target_path}")
         else:
-            raise FileNotFoundError(f"cd: no such file or directory: {target_path}")
+            raise FileNotFoundError(
+                f"cd: no such file or directory: {target_path}"
+            )
 
     def read_file(self, target_path: str) -> str:
         """Read and decode file contents from memory."""
@@ -138,3 +144,27 @@ class VirtualFileSystem:
         content = self.read_file(target_path)
         lines = content.splitlines()
         return "\n".join(reversed(lines))
+
+    def copy_item(self, source_path: str, dest_path: str) -> None:
+        """Copy in-memory file to destination path without touching disk."""
+        src_resolved = self.resolve_path(source_path)
+        if src_resolved not in self.files:
+            if src_resolved in self.directories:
+                raise IsADirectoryError(f"cp: -r not specified: {source_path}")
+            raise FileNotFoundError(f"cp: cannot stat '{source_path}': No such file")
+
+        dst_resolved = self.resolve_path(dest_path)
+        if dst_resolved in self.directories:
+            src_filename = src_resolved.split(PATH_SEP)[-1]
+            if dst_resolved == PATH_SEP:
+                dst_resolved = PATH_SEP + src_filename
+            else:
+                dst_resolved = f"{dst_resolved}/{src_filename}"
+
+        parent_dir = self._normalize_path(os.path.dirname(dst_resolved))
+        if parent_dir not in self.directories:
+            raise FileNotFoundError(
+                f"cp: cannot create regular file '{dest_path}': No such directory"
+            )
+
+        self.files[dst_resolved] = self.files[src_resolved]
